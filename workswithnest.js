@@ -25,16 +25,32 @@ EVT.use(mqtt);
 //Create EVRYTHNG user
 var user = new EVT.User(userAPIKey);
 
-//Define activity zone
+//Define activity zone object
 var activityZone = {
     id: '',
     name: activityZoneName
 };
 
+//Configure alarm LED and button
+var Gpio = require('onoff').Gpio;
+var led = new Gpio(14, 'out');
+var button = new Gpio(4, 'in', 'both');
+var iv = null; //Blinking interval
+
+//Stop the blinking when the button is pressed
+button.watch(function (err, value) {
+  console.log('Button clicked');
+  if (err) {
+    throw err;
+  }
+  clearInterval(iv); // Stop blinking
+  led.writeSync(0);  // Turn LED off.
+});
+
 //Get the camera information
 user.thng(cameraThngId).read().then(function (camera) {
 
-    //Obatin the activity zone id for the zone we want to monitor
+    //Obtain the activity zone id for the zone we want to monitor
     camera.properties.activity_zones.forEach(function (activity_zone) {
         if (activity_zone.name === activityZone.name) {
             activityZone.id = activity_zone.id;
@@ -51,7 +67,21 @@ user.thng(cameraThngId).read().then(function (camera) {
             if( update[0].value.activity_zone_ids[0] == activityZone.id)
             {
                 console.log('Event Detected in ' + activityZone.name);
+		
+		//start blinking the LED
+		clearInterval(iv);
+		iv = setInterval(function(){
+			led.writeSync(led.readSync() === 0 ? 1 : 0)
+		}, 500);
             }
         }
     });
 });
+
+function exit() {
+  led.unexport();
+  button.unexport();
+  process.exit();
+}
+
+process.on('SIGINT', exit);

@@ -6,6 +6,7 @@
     "express": "*",
     "evrythng": "*",
     "evrythng-mqtt": "*",
-    "evrythng-extended": "*"
+    "evrythng-extended": "*",
+    "onoff":"*"	
   }
 }
