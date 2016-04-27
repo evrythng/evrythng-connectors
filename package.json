@@ -7,6 +7,6 @@
     "evrythng": "*",
     "evrythng-mqtt": "*",
     "evrythng-extended": "*",
-    "onoff":"*"	
+    "keypress":"*"
   }
 }
