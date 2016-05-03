@@ -3,9 +3,7 @@
  * */
  var userAPIKey = '';        //Your Application User API Key
  var cameraThngId = '';      //Your Camera ID in EVRYTHNG
- var activityZoneName = '';  //The activity zone name to monitor
  var raspberryPiThngId = ''; //The raspberry pi ID in EVRYTHNG
-
 
 /* EVRYTHNG CONFIGURATION */
 var EVT = require('evrythng-extended'); //Load EVRYTHNG library
@@ -13,10 +11,10 @@ var mqtt = require('evrythng-mqtt'); //Load MQTT support
 
 //Set up environment if not production
 EVT.setup({
-    apiUrl: 'http://api-test.evrythng.net'
+    apiUrl: 'http://api-staging.evrythng.net'
 });
 mqtt.setup({
-    apiUrl: 'mqtts://mqtt-test.evrythng.net:8883/mqtt',
+    apiUrl: 'mqtts://mqtt-staging.evrythng.net:8883/mqtt',
     reconnectPeriod: 1000,
     keepAlive: 50,
     clientIdPrefix: 'evtjs'
@@ -33,24 +31,32 @@ var user = new EVT.User(userAPIKey);
 var raspberryPi = null;
 user.thng(raspberryPiThngId).read().then(function (thng) {
     raspberryPi = thng;
+}).then(function(){
+    console.log("Raspberry Pi connected to the cloud");
 });
 
 var alarmStatus = 'off';
 
 var startAlarm = function () {
-    console.log('Alarm status ON updated in the cloud');
-    alarmStatus = 'on';
-    raspberryPi.property().update({     // Update device status in the cloud
-        alarm: alarmStatus
-    });
+    if(alarmStatus === "off"){
+        alarmStatus = 'on';
+        raspberryPi.property().update({     // Update device status in the cloud
+            alarm: alarmStatus
+        }).then(function(){
+            console.log('Alarm status ON updated in the cloud');
+        });
+    }
 };
 
 var stopAlarm = function () {
-    console.log('Alarm status OFF updated in the cloud');
-    alarmStatus = 'off';
-    raspberryPi.property().update({     // Update device status in the cloud
-        alarm: alarmStatus
-    });
+    if(alarmStatus === "on") {
+        alarmStatus = 'off';
+        raspberryPi.property().update({     // Update device status in the cloud
+            alarm: alarmStatus
+        }).then(function(){
+            console.log('Alarm status OFF updated in the cloud');
+        });
+    }
 };
 
 /* RASPBERRY PI CONFIGURE KEYBOARD to stop alarm */
@@ -72,38 +78,34 @@ process.stdin.setRawMode(true);
 process.stdin.resume();
 /* END RASPBERRY PI CONFIGURE KEYBOARD to stop alarm */
 
-/* Nest CAMERA CONFIGURATION */
-var activityZone = {
-    name: activityZoneName,
-    id: null
-};
-
 //Get the camera information
 var nestCamera = null;
 user.thng(cameraThngId).read().then(function (thng) {
-    console.log('Found Nest Camera!');
-
     nestCamera = thng;
-
-    //Obtain the activity zone id for the zone we want to monitor
-    nestCamera.properties.activity_zones.forEach(function (activity_zone) {
-        if (activity_zone.name === activityZone.name) {
-            activityZone.id = activity_zone.id;
-        }
-    });
-
-    console.log('Subscribing to motion events in: ' + activityZone.name);
+    console.log('Found Nest Camera!: ' + nestCamera.name);
 
     //Subscribe to the motion events
     nestCamera.property('last_event').subscribe(function (update) {
         //Filter events with activity zones only
         if (update[0].value.activity_zone_ids) {
-            //Filter events on the zone we want to monitor
-            if (update[0].value.activity_zone_ids[0] == activityZone.id) {
-                console.log('Event detected in ' + activityZone.name);
-                startAlarm();
-            }
+
+            //Check which activity zones were triggered
+            update[0].value.activity_zone_ids.forEach(function(activityZoneId){
+                //Find the activity zone name
+                nestCamera.properties.activity_zones.forEach(function (activityZone) {
+                        if (activityZone.id == activityZoneId) {
+                            console.log("Motion event detected in activity zone " + activityZone.name + " ["+ update[0].value.start_time + "]");
+                        }
+                    }
+                );
+            });
+
+            //Start the alarm in the PI and update in the cloud
+            startAlarm();
+
         }
+    }).then(function(){
+        console.log('Subscribed to camera motion events in activity zones');
     });
 });
 /* END Nest CAMERA CONFIGURATION */
@@ -152,7 +154,7 @@ app.get("/", function (req, res) {
 
 var port = process.env.PORT || 5000;
 app.listen(port, function () {
-    console.log("Listening on " + port);
+    console.log("Raspberry PI server listening on " + port);
 });
 
 /**
