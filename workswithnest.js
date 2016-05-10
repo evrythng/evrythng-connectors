@@ -9,17 +9,6 @@
 var EVT = require('evrythng-extended'); //Load EVRYTHNG library
 var mqtt = require('evrythng-mqtt'); //Load MQTT support
 
-//Set up environment if not production
-EVT.setup({
-    apiUrl: 'http://api-staging.evrythng.net'
-});
-mqtt.setup({
-    apiUrl: 'mqtts://mqtt-staging.evrythng.net:8883/mqtt',
-    reconnectPeriod: 1000,
-    keepAlive: 50,
-    clientIdPrefix: 'evtjs'
-});
-
 //Set up mqtt
 EVT.use(mqtt);
 
@@ -76,7 +65,6 @@ process.stdin.on('keypress', function (ch, key) {
 
 process.stdin.setRawMode(true);
 process.stdin.resume();
-/* END RASPBERRY PI CONFIGURE KEYBOARD to stop alarm */
 
 //Get the camera information
 var nestCamera = null;
